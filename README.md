@@ -12,7 +12,7 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub release](https://img.shields.io/github/v/release/G1ax/G1axCrystalOptimizer.svg)](https://github.com/G1ax/G1axCrystalOptimizer/releases)
 
-[Download](https://github.com/G1ax/G1axCrystalOptimizer/releases) • [Modrinth](https://modrinth.com/mod/g1axcrystaloptimizer) • [Issues](https://github.com/G1ax/G1axCrystalOptimizer/issues)
+[Download](https://github.com/AkaTriggered/G1ax-Crystal-Optimizer/releases) • [Modrinth](https://modrinth.com/mod/g1axcrystaloptimizer) • [Issues](https://github.com/AkaTriggered/G1ax-Crystal-Optimizer/issues)
 
 </div>
 
@@ -69,7 +69,7 @@ G1ax Crystal Optimizer is a high-performance Fabric client mod that revolutioniz
 ### Steps
 1. Install [Fabric Loader](https://fabricmc.net/use/installer/) for your Minecraft version
 2. Download [Fabric API](https://modrinth.com/mod/fabric-api) from Modrinth
-3. Download the latest G1ax Crystal Optimizer from [Releases](https://github.com/G1ax/G1axCrystalOptimizer/releases)
+3. Download the latest G1ax Crystal Optimizer from [Releases](https://github.com/AkaTriggered/G1ax-Crystal-Optimizer/releases)
 4. Place both `.jar` files in your `mods` folder
 5. Launch Minecraft and enjoy optimized crystal PvP!
 
