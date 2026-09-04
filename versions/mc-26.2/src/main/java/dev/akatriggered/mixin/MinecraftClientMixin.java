@@ -4,41 +4,41 @@ import dev.akatriggered.Main;
 import dev.akatriggered.command.OptimizerCommand;
 import dev.akatriggered.optimizer.CrystalOptimizer;
 import dev.akatriggered.util.PerformanceGuard;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.item.Items;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.world.item.Items;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(MinecraftClient.class)
+@Mixin(Minecraft.class)
 public abstract class MinecraftClientMixin {
 
     @Inject(at = @At("HEAD"), method = "tick")
     private void onTick(CallbackInfo ci) {
-        MinecraftClient mc = (MinecraftClient)(Object) this;
-        if (mc.player == null || mc.world == null) return;
+        Minecraft mc = (Minecraft)(Object) this;
+        if (mc.player == null || mc.level == null) return;
 
         PerformanceGuard guard = Main.getPerformanceGuard();
         if (guard != null) {
             int ping = 0;
-            if (mc.getNetworkHandler() != null) {
-                PlayerListEntry entry = mc.getNetworkHandler().getPlayerListEntry(mc.player.getUuid());
+            if (mc.getConnection() != null) {
+                PlayerInfo entry = mc.getConnection().getPlayerInfo(mc.player.getUUID());
                 if (entry != null) ping = entry.getLatency();
             }
             guard.observePingMillis(ping);
-            guard.observeUseKeyState(mc.options.useKey.isPressed());
+            guard.observeUseKeyState(mc.options.keyUse.isDown());
         }
 
         if (Main.getOptOutCache() != null && Main.getOptOutCache().isOptedOut()) return;
 
-        boolean holdingCrystal = mc.player.getMainHandStack().isOf(Items.END_CRYSTAL)
-            || mc.player.getOffHandStack().isOf(Items.END_CRYSTAL);
+        boolean holdingCrystal = mc.player.getMainHandItem().is(Items.END_CRYSTAL)
+            || mc.player.getOffhandItem().is(Items.END_CRYSTAL);
         if (!holdingCrystal) return;
 
         if (OptimizerCommand.tweakMode) {
-            if (mc.options.useKey.isPressed() && guard != null
+            if (mc.options.keyUse.isDown() && guard != null
                 && ((MinecraftClientAccessor) this).getItemUseCooldown() > 0
                 && guard.allowPlaceBoost()) {
                 ((MinecraftClientAccessor) this).setItemUseCooldown(0);
@@ -48,20 +48,20 @@ public abstract class MinecraftClientMixin {
 
         if (OptimizerCommand.defaultMode) {
             CrystalOptimizer.tick();
-            if (mc.options.useKey.isPressed()
+            if (mc.options.keyUse.isDown()
                 && ((MinecraftClientAccessor) this).getItemUseCooldown() > 0) {
                 ((MinecraftClientAccessor) this).setItemUseCooldown(0);
             }
         }
     }
 
-    @Inject(at = @At("TAIL"), method = "doItemUse")
+    @Inject(at = @At("TAIL"), method = "startUseItem")
     private void onDoItemUseTail(CallbackInfo ci) {
         if (!OptimizerCommand.tweakMode) return;
-        MinecraftClient mc = (MinecraftClient)(Object) this;
+        Minecraft mc = (Minecraft)(Object) this;
         if (mc.player == null) return;
-        boolean holdingCrystal = mc.player.getMainHandStack().isOf(Items.END_CRYSTAL)
-            || mc.player.getOffHandStack().isOf(Items.END_CRYSTAL);
+        boolean holdingCrystal = mc.player.getMainHandItem().is(Items.END_CRYSTAL)
+            || mc.player.getOffhandItem().is(Items.END_CRYSTAL);
         if (!holdingCrystal) return;
         if (Main.getOptOutCache() != null && Main.getOptOutCache().isOptedOut()) return;
         PerformanceGuard guard = Main.getPerformanceGuard();
@@ -70,13 +70,13 @@ public abstract class MinecraftClientMixin {
         }
     }
 
-    @Inject(at = @At("HEAD"), method = "doItemUse", cancellable = true)
+    @Inject(at = @At("HEAD"), method = "startUseItem", cancellable = true)
     private void onDoItemUseHead(CallbackInfo ci) {
         if (!OptimizerCommand.defaultMode) return;
-        MinecraftClient mc = (MinecraftClient)(Object) this;
+        Minecraft mc = (Minecraft)(Object) this;
         if (mc.player == null) return;
-        if (!mc.player.getMainHandStack().isOf(Items.END_CRYSTAL)) return;
-        if (!mc.options.useKey.isPressed()) return;
+        if (!mc.player.getMainHandItem().is(Items.END_CRYSTAL)) return;
+        if (!mc.options.keyUse.isDown()) return;
         ci.cancel();
     }
 }

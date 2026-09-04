@@ -3,42 +3,42 @@ package dev.akatriggered.optimizer;
 import dev.akatriggered.Main;
 import dev.akatriggered.cache.OptOutCache;
 import dev.akatriggered.util.PerformanceGuard;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.decoration.EndCrystalEntity;
-import net.minecraft.item.Items;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 
 public class CrystalOptimizer {
 
-    private static final MinecraftClient mc = MinecraftClient.getInstance();
+    private static final Minecraft mc = Minecraft.getInstance();
 
     public static void tick() {
         PerformanceGuard guard = Main.getPerformanceGuard();
         OptOutCache cache = Main.getOptOutCache();
         if (guard == null || cache == null || cache.isOptedOut()) return;
-        if (mc.player == null || mc.world == null) return;
-        if (!mc.player.getMainHandStack().isOf(Items.END_CRYSTAL)) return;
-        if (!mc.options.useKey.isPressed()) return;
+        if (mc.player == null || mc.level == null) return;
+        if (!mc.player.getMainHandItem().is(Items.END_CRYSTAL)) return;
+        if (!mc.options.keyUse.isDown()) return;
         if (!guard.allowPlaceBoost()) return;
 
         BlockHitResult lookResult = raycastBlocks(4.5);
         if (lookResult == null || lookResult.getType() != HitResult.Type.BLOCK) return;
 
         BlockPos targetPos = lookResult.getBlockPos();
-        Direction hitFace = lookResult.getSide();
+        Direction hitFace = lookResult.getDirection();
 
         // Edge fix: if the raycast hit a non-obsidian block (e.g. grass at the edge),
         // check adjacent blocks for a valid obsidian/bedrock base.
@@ -54,21 +54,21 @@ public class CrystalOptimizer {
         // climbing to unreachable positions on tall walls.
         BlockPos actualBase = targetPos;
         if (hitFace == Direction.UP) {
-            while (isValidBase(actualBase.up())) {
-                actualBase = actualBase.up();
+            while (isValidBase(actualBase.above())) {
+                actualBase = actualBase.above();
             }
         }
 
         // Relaxed space check: only verify no blocking entities.
         // Let the server validate block-level obstructions so placement
         // works near stacked obsidian, slabs, and edges.
-        if (!isSpaceFree(actualBase.up())) return;
+        if (!isSpaceFree(actualBase.above())) return;
 
-        ActionResult result = mc.interactionManager.interactBlock(
+        InteractionResult result = mc.gameMode.useItemOn(
             mc.player,
-            Hand.MAIN_HAND,
+            InteractionHand.MAIN_HAND,
             new BlockHitResult(
-                Vec3d.ofCenter(actualBase).add(0, 0.5, 0),
+                Vec3.atCenterOf(actualBase).add(0, 0.5, 0),
                 Direction.UP,
                 actualBase,
                 false
@@ -76,12 +76,12 @@ public class CrystalOptimizer {
         );
 
         if (dev.akatriggered.util.ActionResultResolver.isAccepted(result)) {
-            mc.player.swingHand(Hand.MAIN_HAND);
+            mc.player.swing(InteractionHand.MAIN_HAND);
         }
     }
 
     public static void onCrystalAttackPacket(Entity entity) {
-        if (!(entity instanceof EndCrystalEntity crystal)) return;
+        if (!(entity instanceof EndCrystal crystal)) return;
         PerformanceGuard guard = Main.getPerformanceGuard();
         OptOutCache cache = Main.getOptOutCache();
         if (guard == null || cache == null || cache.isOptedOut()) return;
@@ -92,9 +92,9 @@ public class CrystalOptimizer {
     }
 
     private static boolean isValidBase(BlockPos pos) {
-        if (mc.world == null) return false;
-        BlockState state = mc.world.getBlockState(pos);
-        return state.isOf(Blocks.OBSIDIAN) || state.isOf(Blocks.BEDROCK);
+        if (mc.level == null) return false;
+        BlockState state = mc.level.getBlockState(pos);
+        return state.is(Blocks.OBSIDIAN) || state.is(Blocks.BEDROCK);
     }
 
     /**
@@ -104,7 +104,7 @@ public class CrystalOptimizer {
      */
     private static BlockPos findAdjacentBase(BlockPos hitPos) {
         for (Direction dir : Direction.values()) {
-            BlockPos neighbor = hitPos.offset(dir);
+            BlockPos neighbor = hitPos.relative(dir);
             if (isValidBase(neighbor)) {
                 return neighbor;
             }
@@ -118,21 +118,21 @@ public class CrystalOptimizer {
      * placement works correctly near stacked obsidian, walls, and edges.
      */
     private static boolean isSpaceFree(BlockPos above) {
-        if (mc.world == null) return false;
+        if (mc.level == null) return false;
         double x = above.getX(), y = above.getY(), z = above.getZ();
-        List<Entity> blocking = mc.world.getOtherEntities(mc.player,
-            new Box(x, y, z, x + 1.0, y + 2.0, z + 1.0));
+        List<Entity> blocking = mc.level.getEntities(mc.player,
+            new AABB(x, y, z, x + 1.0, y + 2.0, z + 1.0));
         return blocking.isEmpty();
     }
 
     private static BlockHitResult raycastBlocks(double reach) {
-        Vec3d eye = mc.player.getEyePos();
-        Vec3d look = mc.player.getRotationVec(1.0f);
-        Vec3d end = eye.add(look.multiply(reach));
-        HitResult hit = mc.world.raycast(new RaycastContext(
+        Vec3 eye = mc.player.getEyePosition();
+        Vec3 look = mc.player.getViewVector(1.0f);
+        Vec3 end = eye.add(look.scale(reach));
+        HitResult hit = mc.level.clip(new ClipContext(
             eye, end,
-            RaycastContext.ShapeType.OUTLINE,
-            RaycastContext.FluidHandling.NONE,
+            ClipContext.Block.OUTLINE,
+            ClipContext.Fluid.NONE,
             mc.player
         ));
         return hit instanceof BlockHitResult bhr ? bhr : null;

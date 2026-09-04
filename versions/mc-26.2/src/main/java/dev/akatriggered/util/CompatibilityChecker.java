@@ -12,9 +12,7 @@ public class CompatibilityChecker {
     private static final String ISSUES = "github.com/tech-anupam/G1ax-Crystal-Optimizer/issues";
 
     private static final List<String> TESTED_VERSIONS = List.of(
-        "1.21", "1.21.1", "1.21.2", "1.21.3", "1.21.4",
-        "1.21.5", "1.21.6", "1.21.7", "1.21.8", "1.21.9",
-        "1.21.10", "1.21.11", "26.1.0", "26.1.1", "26.1.2"
+        "26.1.0", "26.1.1", "26.1.2", "26.2"
     );
 
     public record CheckResult(boolean ok, String issue, String[] fixSteps) {}
@@ -61,7 +59,7 @@ public class CompatibilityChecker {
                 "  1. Check " + ISSUES + " for your version",
                 "  2. If not reported, open a new issue with this log file",
                 "  3. Join " + DISCORD + " for faster support",
-                "  4. Try downgrading to 1.21.11 which is fully tested"
+                "  4. Try using 26.2 which is fully tested"
             }
         );
     }
@@ -88,12 +86,12 @@ public class CompatibilityChecker {
     private static CheckResult checkPayloadRegistry() {
         try {
             Class<?> reg = Class.forName("net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry");
-            Method m = reg.getMethod("playC2S");
+            Method m = reg.getMethod("serverboundPlay");
             m.invoke(null);
             return new CheckResult(true, null, null);
         } catch (NoSuchMethodException e) {
             return new CheckResult(false,
-                "PayloadTypeRegistry.playC2S() not found — Fabric API too old or changed API",
+                "PayloadTypeRegistry.serverboundPlay() not found — Fabric API too old or changed API",
                 new String[]{
                     "HOW TO FIX:",
                     "  This mod's OptOut packet cannot register (non-fatal, mod still works)",
@@ -110,16 +108,16 @@ public class CompatibilityChecker {
     }
 
     private static CheckResult checkMixinTargets() {
-        boolean clientOk = classExists("net.minecraft.client.MinecraftClient") || classExists("net.minecraft.class_310");
-        boolean crystalOk = classExists("net.minecraft.item.EndCrystalItem") || classExists("net.minecraft.class_1774");
-        boolean connOk = classExists("net.minecraft.network.ClientConnection") || classExists("net.minecraft.class_2535");
+        boolean clientOk = classExists("net.minecraft.client.Minecraft");
+        boolean crystalOk = classExists("net.minecraft.world.item.EndCrystalItem");
+        boolean connOk = classExists("net.minecraft.network.Connection");
 
         if (clientOk && crystalOk && connOk) return new CheckResult(true, null, null);
 
         List<String> missing = new ArrayList<>();
-        if (!clientOk) missing.add("MinecraftClient");
+        if (!clientOk) missing.add("Minecraft");
         if (!crystalOk) missing.add("EndCrystalItem");
-        if (!connOk) missing.add("ClientConnection");
+        if (!connOk) missing.add("Connection");
 
         return new CheckResult(false,
             "Mixin targets not found: " + String.join(", ", missing),
@@ -165,7 +163,7 @@ public class CompatibilityChecker {
     }
 
     private static void scheduleInGameMessage(String msg) {
-        net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         if (mc != null) {
             mc.execute(() -> OptimizerCommand.msg(msg));
         }

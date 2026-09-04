@@ -1,73 +1,79 @@
 # 🔮 G1ax Crystal Optimizer Release Notes
 
-## 🚀 Version 1.0.4
+## 🛠️ Version 1.0.5
 
 ### Bug Fixes
 
-#### [Issue 7] Command Output Colors Not Rendering
-- Fixed all `§` color codes in chat messages being silently ignored.
-- Root cause: `MutableText.formatted()` is non-mutating — the returned styled text was discarded, causing every color, bold, and italic code to fall back to plain white.
-- All command output (`/g1axoptimizer default`, `tweak`, `off`, status) now renders with correct gold, green, red, yellow, and gray formatting.
+#### Crystal Placement on Block Edges (Default Mode)
+- Fixed an issue where crystals could not be placed when targeting near the edge of an obsidian or bedrock block.
+- Root cause: When aiming near the border or edge of obsidian, the crosshair raycast frequently hits an adjacent surface (such as grass, dirt, or cobblestone) or a side face, causing base validation to fail.
+- Fix: Introduced adjacent base detection (`findAdjacentBase`). When an edge click lands on a non-base block, the optimizer checks immediate neighboring blocks for a valid obsidian/bedrock base and routes the interaction correctly.
+
+#### Crystal Placement Under Blocks & Overhangs (Default Mode)
+- Fixed an issue where crystals could not be placed under overhangs, ceilings, or structures with low vertical clearance.
+- Root cause: The optimizer enforced a legacy 2-block air clearance check (`!isAir(above.up())`), rejecting valid placements whenever a block existed 2 blocks above the base.
+- Fix: Relaxed the space check to match modern Minecraft mechanics by only checking entity collision obstructions, allowing smooth placement under ceilings, overhangs, and stacked block setups.
+
+#### Stacked Obsidian Traversal Adjusted
+- Only traversals on the top face (`Direction.UP`) walk up stacked obsidian, ensuring side-face hits target the intended block directly without jumping to unreachable heights.
+
+### Improvements
+
+#### Mode Toggle Feedback Moved to Action Bar
+- `/g1axoptimizer default`, `tweak`, and `off` no longer dump lines of text into your chat.
+- Mode changes now show a single clean confirmation above your hotbar (the action bar), which fades automatically — no chat clutter mid-fight.
+  - ✔ **Default Mode** — Full optimizer enabled
+  - ✔ **Tweak Mode** — AC-safe cooldown bypass enabled
+  - ✗ **Optimizer Disabled** — Vanilla crystal behavior
+- `/g1axoptimizer` with no arguments still prints the current mode and usage to chat since that's a deliberate status check.
+
+---
+
+## 🚀 Version 1.0.4
+
 
 ### New Features
 
-#### [Issue 8] Modrinth Auto Update Checker
+#### Performance Enhancement
+- Integrated **PerformanceGuard**: A nanosecond-precision, ping-adaptive rate limiter with independent budgets for placing and breaking to maximize PvP performance.
+- Added **OptOutCache**: Multi-server session-persistent opt-out memory that retains server-requested disable states across logins (up to 10 servers).
+- **Handshake Protocol Integration**:
+  - `VersionPacket` (C2S): Announces current project version to server.
+  - `ServerOptOutPacket` (S2C): Receives server instructions to disable the optimizer, displaying a clean hoverable notification in game.
+  - `OptOutAckPacket` (C2S): Acknowledges server opt-out commands.
+
+#### Modrinth Auto Update Checker
 - Added `UpdateChecker.java` — a lightweight background update checker powered by the public Modrinth API (no API key required).
 - On mod load, a daemon thread silently fetches the latest published version from `api.modrinth.com`.
 - The first tick the player enters a world, if a newer version is available, a single beautifully formatted notification is displayed in chat with the download link and custom dev contact.
 - Shows **once per session only** — no spam.
 - If already on the latest version, completely silent.
 
----
-
-## 🚀 Version 1.0.3
-
-
-### New Features & Enhancements
-
-#### [Issue 3] Clean Formatted Live Logging Engine
-- Replaced the messy standard log output with a beautifully formatted live logging engine in [Logger.java](file:///d:/G1axProjects/Mods/G1ax-Crystal-Optimizer-main/G1ax-Crystal-Optimizer-main/src/main/java/dev/akatriggered/util/Logger.java).
-- Log lines are structured cleanly (e.g. `[HH:mm:ss] [G1ax/LEVEL] Message`) and written to a dedicated log file at `.minecraft/logs/g1axoptimizer-latest.log`.
-- Implemented automatic log rotation that preserves the last 3 log files (`g1axoptimizer-1.log`, `g1axoptimizer-2.log`, `g1axoptimizer-3.log`) to keep log directory clean.
-
-#### [Issue 4] Pre-Flight Compatibility Diagnostics
-- Added an automatic check engine in [CompatibilityChecker.java](file:///d:/G1axProjects/Mods/G1ax-Crystal-Optimizer-main/G1ax-Crystal-Optimizer-main/src/main/java/dev/akatriggered/util/CompatibilityChecker.java) that runs on startup.
-- Automatically validates Minecraft version, Fabric API, Payload Registry support, Mixin targets, and Java 21+ configuration.
-- Generates step-by-step resolution guides in the dedicated log file and triggers an alert in-game if any compatibility issues are found.
-
-#### [Issue 5] AC-Safe Tweak Mode
-- Added Tweak Mode configurable via `/g1axoptimizer tweak`.
-- Bypasses the 4-tick client-side placement cooldown (`itemUseCooldown = 0`) while keeping the rest of the placement validation and packet logic completely vanilla.
-- Safe to use on competitive servers with strict anticheats.
-
-#### [Issue 6] Cross-Version Compatibility Fixes
-- Replaced static method and field lookups (such as `MinecraftVersion.CURRENT` and `SharedConstants.getGameVersion().getName()`) with a robust reflection resolver.
-- Automatically checks for `getId()`, `getName()`, and `getVersionId()` to run stably across various Minecraft versions without compilation or launch failures.
-
----
-
-## 🚀 Version 1.0.2
-
 ### Bug Fixes
 
-#### [Issue 1] NoSuchMethodError Crash
-- Fixed `NoSuchMethodError` when placing crystals on certain Minecraft version environments.
-- Replaced manual trigonometry calculations with Minecraft's official `getRotationVec()` method.
+#### Command Output Colors Not Rendering
+- Fixed all `§` color codes in chat messages being silently ignored.
+- Root cause: `MutableText.formatted()` is non-mutating — the returned styled text was discarded, causing every color, bold, and italic code to fall back to plain white.
+- All command output (`/g1axoptimizer default`, `tweak`, `off`, status) now renders with correct gold, green, red, yellow, and gray formatting.
 
-#### [Issue 2] Mod Compatibility Crashes
-- Added comprehensive crash handlers to prevent conflicts with other crystal mods.
-- Verified compatibility with:
-  - Client Side Crystals
-  - Crystal Anchor Counter
-  - Marlow's Crystal Optimizer
-  - Safe Crystals
-  - Knockback Optimizer
-- Added null safety checks and thread-safety protections for asynchronous operations.
+#### Classloading Mismatch / Mixin Startup Crash (Minecraft 1.21)
+- Resolved startup crash with `ClassMetadataNotFoundException: net.minecraft.class_1269$class_9859` when running on Minecraft 1.21.
+- Root cause: `ActionResult` was refactored from an enum to a sealed interface in 1.21.2+. Compiling against 1.21.11 caused references to `ActionResult.PASS` to seek non-existent inner records.
+- Solution: Introduced `ActionResultResolver.java` using reflection to dynamically retrieve `SUCCESS`, `CONSUME`, and `PASS` constants across all Minecraft 1.21–1.21.11 builds, resolving any compile-time bytecode dependency on the inner classes.
 
----
+#### Incorrect Compatibility Warnings on Production/Obfuscated Clients
+- Fixed startup log output displaying `Minecraft: unknown` and reporting `INCOMPATIBILITY: Mixin targets not found: MinecraftClient, EndCrystalItem, ClientConnection`.
+- Root cause: `CompatibilityChecker` looked up named classes (`MinecraftClient`, etc.) which are obfuscated to intermediary names (`class_310`, etc.) in the production environment. Also, `SharedConstants` reflection failed due to obfuscated method names.
+- Solution: Updated `CompatibilityChecker` to query both named and intermediary names for class presence, and integrated Fabric Loader's mod container version lookup for robust, obfuscation-safe Minecraft version detection.
 
-## 🚀 Version 1.0.1
+#### NoSuchMethodError Registry Crash on Older Fabric API Versions
+- Resolved startup crash throwing `NoSuchMethodError: 'net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry.playC2S()'` when running on older Fabric API versions.
+- Root cause: The mod registered packets directly via the `PayloadTypeRegistry` class APIs which did not exist or had different signatures on older Fabric API versions.
+- Solution: Migrated all packet registrations to use reflection and dynamic method lookup (handling missing classes and method mismatches gracefully), allowing the mod to start up without crashes on all Fabric API versions.
 
-### Version Update
-- Updated mod to target Minecraft 1.21.11+ Fabric environments.
-- Updated dependencies to align with modern Fabric API versions.
+#### NoClassDefFoundError HoverEvent$ShowText Crash on Minecraft 1.21/1.21.1
+- Resolved startup crash throwing `java.lang.NoClassDefFoundError: net/minecraft/class_2568$class_10613` (HoverEvent$ShowText) when running on Minecraft 1.21/1.21.1.
+- Root cause: Minecraft 1.21.2+ introduced `HoverEvent.ShowText` (obfuscated as `class_2568$class_10613`). Compiling against 1.21.11 introduced a direct bytecode reference to this class, which does not exist in Minecraft 1.21/1.21.1 client runtime environments.
+- Solution: Created `HoverEventResolver.java` using dynamic reflection to detect class availability. It dynamically instantiates `HoverEvent.ShowText` on 1.21.2+ environments and falls back to passing `Text` directly on 1.21/1.21.1 environments, removing all static compile-time classloading references.
+
+
